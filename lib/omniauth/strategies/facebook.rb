@@ -34,6 +34,7 @@ module OmniAuth
           'nickname' => raw_info['username'],
           'email' => raw_info['email'],
           'name' => raw_info['name'],
+          'gender' => raw_info['gender'],
           'first_name' => raw_info['first_name'],
           'last_name' => raw_info['last_name'],
           'image' => image_url(uid, options),
