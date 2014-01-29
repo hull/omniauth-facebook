@@ -25,7 +25,7 @@ module CustomAssertions
   end
 end
 
-class TestCase < MiniTest::Unit::TestCase
+class TestCase < Minitest::Test
   extend BlockTestHelper
   include CustomAssertions
 end
@@ -36,6 +36,7 @@ class StrategyTestCase < TestCase
     @request.stubs(:params).returns({})
     @request.stubs(:cookies).returns({})
     @request.stubs(:env).returns({})
+    @request.stubs(:scheme).returns({})
     @request.stubs(:ssl?).returns(false)
 
     @client_id = '123'

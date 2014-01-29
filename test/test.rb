@@ -56,12 +56,6 @@ class AuthorizeParamsTest < StrategyTestCase
     assert_equal 'touch', strategy.authorize_params[:display]
   end
 
-  test 'includes state parameter from request when present' do
-    @request.stubs(:params).returns({ 'state' => 'some_state' })
-    assert strategy.authorize_params.is_a?(Hash)
-    assert_equal 'some_state', strategy.authorize_params[:state]
-  end
-
   test 'includes auth_type parameter from request when present' do
     @request.stubs(:params).returns({ 'auth_type' => 'reauthenticate' })
     assert strategy.authorize_params.is_a?(Hash)
@@ -121,13 +115,9 @@ class InfoTest < StrategyTestCase
     @options = { :image_size => { :width => 123, :height => 987 } }
     raw_info = { 'name' => 'Fred Smith', 'id' => '321' }
     strategy.stubs(:raw_info).returns(raw_info)
-    image_url = strategy.info['image']
-    path, query = image_url.split("?")
-    query_params = Hash[*query.split("&").map {|pair| pair.split("=") }.flatten]
-
-    assert_equal 'http://graph.facebook.com/321/picture', path
-    assert_equal '123', query_params['width']
-    assert_equal '987', query_params['height']
+    assert_match 'width=123', strategy.info['image']
+    assert_match 'height=987', strategy.info['image']
+    assert_match 'http://graph.facebook.com/321/picture?', strategy.info['image']
   end
 end
 
@@ -252,31 +242,58 @@ class RawInfoTest < StrategyTestCase
   def setup
     super
     @access_token = stub('OAuth2::AccessToken')
+    @appsecret_proof = 'appsecret_proof'
+    @options = {:appsecret_proof => @appsecret_proof}
   end
 
   test 'performs a GET to https://graph.facebook.com/me' do
+    strategy.stubs(:appsecret_proof).returns(@appsecret_proof)
     strategy.stubs(:access_token).returns(@access_token)
-    @access_token.expects(:get).with('/me', {}).returns(stub_everything('OAuth2::Response'))
+    params = {:params => @options}
+    @access_token.expects(:get).with('/me', params).returns(stub_everything('OAuth2::Response'))
+    strategy.raw_info
+  end
+
+  test 'performs a GET to https://graph.facebook.com/me with locale' do
+    @options.merge!({ :locale => 'cs_CZ' })
+    strategy.stubs(:access_token).returns(@access_token)
+    strategy.stubs(:appsecret_proof).returns(@appsecret_proof)
+    params = {:params => @options}
+    @access_token.expects(:get).with('/me', params).returns(stub_everything('OAuth2::Response'))
+    strategy.raw_info
+  end
+
+  test 'performs a GET to https://graph.facebook.com/me with info_fields' do
+    @options.merge!({:info_fields => 'about'})
+    strategy.stubs(:access_token).returns(@access_token)
+    strategy.stubs(:appsecret_proof).returns(@appsecret_proof)
+    params = {:params => {:appsecret_proof => @appsecret_proof, :fields => 'about'}}
+    @access_token.expects(:get).with('/me', params).returns(stub_everything('OAuth2::Response'))
     strategy.raw_info
   end
 
   test 'returns a Hash' do
     strategy.stubs(:access_token).returns(@access_token)
+    strategy.stubs(:appsecret_proof).returns(@appsecret_proof)
     raw_response = stub('Faraday::Response')
     raw_response.stubs(:body).returns('{ "ohai": "thar" }')
     raw_response.stubs(:status).returns(200)
     raw_response.stubs(:headers).returns({'Content-Type' => 'application/json' })
     oauth2_response = OAuth2::Response.new(raw_response)
-    @access_token.stubs(:get).with('/me', {}).returns(oauth2_response)
+    params = {:params => @options}
+    @access_token.stubs(:get).with('/me', params).returns(oauth2_response)
     assert_kind_of Hash, strategy.raw_info
     assert_equal 'thar', strategy.raw_info['ohai']
   end
 
   test 'returns an empty hash when the response is false' do
     strategy.stubs(:access_token).returns(@access_token)
+    strategy.stubs(:appsecret_proof).returns(@appsecret_proof)
     oauth2_response = stub('OAuth2::Response', :parsed => false)
-    @access_token.stubs(:get).with('/me', {}).returns(oauth2_response)
+    params = {:params => @options}
+    @access_token.stubs(:get).with('/me', params).returns(oauth2_response)
     assert_kind_of Hash, strategy.raw_info
+    assert_equal({}, strategy.raw_info)
   end
 
   test 'should not include raw_info in extras hash when skip_info is specified' do
@@ -379,13 +396,18 @@ module SignedRequestTests
     test 'is nil' do
       assert_nil strategy.send(:signed_request)
     end
+
+    test 'throws an error on calling build_access_token' do
+      assert_equal 'must pass either a `code` parameter or a signed request (via `signed_request` parameter or a `fbsr_XXX` cookie)',
+                   assert_raises(OmniAuth::Strategies::Facebook::NoAuthorizationCodeError) { strategy.send(:build_access_token) }.message
+    end
   end
 
   class CookiePresentTest < TestCase
-    def setup
-      super
+    def setup(algo = nil)
+      super()
       @payload = {
-        'algorithm' => 'HMAC-SHA256',
+        'algorithm' => algo || 'HMAC-SHA256',
         'code' => 'm4c0d3z',
         'issued_at' => Time.now.to_i,
         'user_id' => '123456'
@@ -397,13 +419,18 @@ module SignedRequestTests
     test 'parses the access code out from the cookie' do
       assert_equal @payload, strategy.send(:signed_request)
     end
+
+    test 'throws an error if the algorithm is unknown' do
+      setup('UNKNOWN-ALGO')
+      assert_equal "unknown algorithm: UNKNOWN-ALGO", assert_raises(OmniAuth::Strategies::Facebook::UnknownSignatureAlgorithmError) { strategy.send(:signed_request) }.message
+    end
   end
 
   class ParamPresentTest < TestCase
-    def setup
-      super
+    def setup(algo = nil)
+      super()
       @payload = {
-        'algorithm' => 'HMAC-SHA256',
+        'algorithm' => algo || 'HMAC-SHA256',
         'oauth_token' => 'XXX',
         'issued_at' => Time.now.to_i,
         'user_id' => '123456'
@@ -414,6 +441,11 @@ module SignedRequestTests
 
     test 'parses the access code out from the param' do
       assert_equal @payload, strategy.send(:signed_request)
+    end
+
+    test 'throws an error if the algorithm is unknown' do
+      setup('UNKNOWN-ALGO')
+      assert_equal "unknown algorithm: UNKNOWN-ALGO", assert_raises(OmniAuth::Strategies::Facebook::UnknownSignatureAlgorithmError) { strategy.send(:signed_request) }.message
     end
   end
 
@@ -439,6 +471,18 @@ module SignedRequestTests
       assert_equal @payload_from_param, strategy.send(:signed_request)
     end
   end
+
+  class EmptySignedRequestTest < TestCase
+    def setup
+      super
+      @request.stubs(:params).returns({'signed_request' => ''})
+    end
+
+    test 'empty param' do
+      assert_equal nil, strategy.send(:signed_request)
+    end
+  end
+
 end
 
 class RequestPhaseWithSignedRequestTest < StrategyTestCase
@@ -484,30 +528,14 @@ module BuildAccessTokenTests
     end
 
     test 'returns a new access token from the signed request' do
-      result = strategy.build_access_token
+      result = strategy.send(:build_access_token)
       assert_kind_of ::OAuth2::AccessToken, result
       assert_equal @payload['oauth_token'], result.token
     end
 
     test 'returns an access token with the correct expiry time' do
-      result = strategy.build_access_token
+      result = strategy.send(:build_access_token)
       assert_equal @payload['expires'], result.expires_at
-    end
-  end
-
-  class ParamsContainAccessTokenStringTest < TestCase
-    def setup
-      super
-
-      @request.stubs(:params).returns({'access_token' => 'm4c0d3z'})
-
-      strategy.stubs(:callback_url).returns('/')
-    end
-
-    test 'returns a new access token' do
-      result = strategy.build_access_token
-      assert_kind_of ::OAuth2::AccessToken, result
-      assert_equal 'm4c0d3z', result.token
     end
   end
 end

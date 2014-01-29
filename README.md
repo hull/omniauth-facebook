@@ -1,6 +1,13 @@
+**IMPORTANT: If you're running < 1.5.1, please upgrade to address 2 security vulnerabilities.
+More details [here](https://github.com/mkdynamic/omniauth-facebook/wiki/CSRF-vulnerability:-CVE-2013-4562) and [here](https://github.com/mkdynamic/omniauth-facebook/wiki/Access-token-vulnerability:-CVE-2013-4593).**
+
+---
+
 # OmniAuth Facebook &nbsp;[![Build Status](https://secure.travis-ci.org/mkdynamic/omniauth-facebook.png?branch=master)](https://travis-ci.org/mkdynamic/omniauth-facebook)
 
-Facebook OAuth2 Strategy for OmniAuth 1.0.
+**These notes are based on master, please see tags for README pertaining to specific releases.**
+
+Facebook OAuth2 Strategy for OmniAuth.
 
 Supports the OAuth 2.0 server-side and client-side flows. Read the Facebook docs for more details: http://developers.facebook.com/docs/authentication
 
@@ -16,7 +23,7 @@ Then `bundle install`.
 
 ## Usage
 
-`OmniAuth::Strategies::Facebook` is simply a Rack middleware. Read the OmniAuth 1.0 docs for detailed instructions: https://github.com/intridea/omniauth.
+`OmniAuth::Strategies::Facebook` is simply a Rack middleware. Read the OmniAuth docs for detailed instructions: https://github.com/intridea/omniauth.
 
 Here's a quick example, adding the middleware to a Rails app in `config/initializers/omniauth.rb`:
 
@@ -38,7 +45,8 @@ You can configure several options, which you pass in to the `provider` method vi
 Valid values are `https` (checks for the presence of the secure cookie and asks for re-authentication if it is not present), and `reauthenticate` (asks the user to re-authenticate unconditionally). Default is `nil`.
 * `secure_image_url`: Set to `true` to use https for the avatar image url returned in the auth hash. Default is `false`.
 * `image_size`: Set the size for the returned image url in the auth hash. Valid options include `square` (50x50), `small` (50 pixels wide, variable height), `normal` (100 pixels wide, variable height), or `large` (about 200 pixels wide, variable height). Additionally, you can request a picture of a specific size by setting this option to a hash with `:width` and `:height` as keys. This will return an available profile picture closest to the requested size and requested aspect ratio. If only `:width` or `:height` is specified, we will return a picture whose width or height is closest to the requested size, respectively.
-* `info_fields`: Specify exactly which fields should be returned when getting the user's info. Value should be a comma-separated string as per https://developers.facebook.com/docs/reference/api/user/.
+* `info_fields`: Specify exactly which fields should be returned when getting the user's info. Value should be a comma-separated string as per https://developers.facebook.com/docs/reference/api/user/ (only /me endpoint).
+* `locale`: Specify locale which should be used when getting the user's info. Value should be locale string as per https://developers.facebook.com/docs/reference/api/locale/.
 
 For example, to request `email`, `user_birthday` and `read_stream` permissions and display the authentication page in a popup window:
 
@@ -52,8 +60,6 @@ end
 ### Per-Request Options
 
 If you want to set the `display` format, `auth_type`, or `scope` on a per-request basis, you can just pass it to the OmniAuth request phase URL, for example: `/auth/facebook?display=popup` or `/auth/facebook?scope=email`.
-
-You can also pass through a `state` param which will be passed along to the callback url.
 
 ### Custom Callback URL/Path
 
@@ -137,7 +143,7 @@ There are then 2 scenarios for what happens next:
 
 Take a look at [the example Sinatra app for one option of how you can integrate with a canvas page](https://github.com/mkdynamic/omniauth-facebook/blob/master/example/config.ru).
 
-Bear in mind you have several options (including [authenticated referrals](https://developers.facebook.com/docs/opengraph/authentication/#referrals)). Read [the Facebook docs on canvas page  authentication](https://developers.facebook.com/docs/authentication/canvas/) for more info.
+Bear in mind you have several [options](https://developers.facebook.com/docs/opengraph/authentication). Read [the Facebook docs on canvas page  authentication](https://developers.facebook.com/docs/authentication/canvas/) for more info.
 
 ## Token Expiry
 
@@ -159,16 +165,13 @@ If you're having issue getting a long lived token with the server-side flow, mak
 
 Actively tested with the following Ruby versions:
 
+- MRI 2.1.0
+- MRI 2.0.0
 - MRI 1.9.3
 - MRI 1.9.2
 - MRI 1.8.7
-- JRuby 1.6.5
-
-*NB.* For JRuby, you'll need to install the `jruby-openssl` gem. There's no way to automatically specify this in a Rubygem gemspec, so you need to manually add it your project's own Gemfile:
-
-```ruby
-gem 'jruby-openssl', :platform => :jruby
-```
+- JRuby 1.7.9
+- Rubinius (latest stable)
 
 ## License
 
@@ -179,3 +182,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/mkdynamic/omniauth-facebook/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
